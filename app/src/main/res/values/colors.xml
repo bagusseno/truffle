@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="colorPrimary">#b51100</color>
+    <color name="colorPrimaryDark">#303F9F</color>
+    <color name="colorAccent">#d91400</color>
+    <color name="colorInverse">#ffff</color>
+    <color name="colorInverseFade">#a4ffffff</color>
+    <color name="colorOff">#787878</color>
+    <color name="colorSelectedBackground">#e4e4e4</color>
+    <color name="colorGrey">#d7d7d7</color>
+    <color name="colorUltraLight">#f2f2f2</color>
+</resources>
