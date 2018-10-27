@@ -1,4 +1,4 @@
-<!DOCTYPE resources [<!ENTITY appname "tratra"><!ENTITY postDesignation "Trace">]>
+<!DOCTYPE resources [<!ENTITY appname "truffle"><!ENTITY postDesignation "Trace">]>
 <resources>
     <string name="app_name">&appname;</string>
     <string name="action_settings">Settings</string>

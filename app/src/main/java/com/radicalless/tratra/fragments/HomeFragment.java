@@ -3,14 +3,18 @@ package com.radicalless.tratra.fragments;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.SharedPreferences;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
 import android.support.v7.app.AlertDialog;
+import android.util.Base64;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageView;
 import android.widget.ListView;
 import android.widget.TextView;
 
@@ -18,6 +22,7 @@ import com.android.volley.Request;
 import com.android.volley.RequestQueue;
 import com.android.volley.Response;
 import com.android.volley.VolleyError;
+import com.android.volley.toolbox.ImageRequest;
 import com.android.volley.toolbox.StringRequest;
 import com.android.volley.toolbox.Volley;
 import com.radicalless.tratra.R;
@@ -27,19 +32,27 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.util.HashMap;
 import java.util.Map;
 
 public class HomeFragment extends Fragment {
     // TODO: Rename parameter arguments, choose names that match
     // the fragment initialization parameters, e.g. ARG_ITEM_NUMBER
-    private static final String ARG_PARAM1 = "param1";
-    private static final String ARG_PARAM2 = "param2";
+    private static final String USER_USERNAME = "userUsername";
+    private static final String USER_PROFILE = "userProfile";
+    private static final String USER_DISTANCE = "userDistance";
 
     // TODO: Rename and change types of parameters
     private String mParam1;
     private String mParam2;
 
+    TextView txtDistance;
+    TextView txtUsername;
+    ImageView ivProfile;
+
+    ListView checkInListView;
     private OnFragmentInteractionListener mListener;
 
     public HomeFragment() {
@@ -58,8 +71,6 @@ public class HomeFragment extends Fragment {
     public static HomeFragment newInstance(String param1, String param2) {
         HomeFragment fragment = new HomeFragment();
         Bundle args = new Bundle();
-        args.putString(ARG_PARAM1, param1);
-        args.putString(ARG_PARAM2, param2);
         fragment.setArguments(args);
         return fragment;
     }
@@ -67,25 +78,36 @@ public class HomeFragment extends Fragment {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        if (getArguments() != null) {
-            mParam1 = getArguments().getString(ARG_PARAM1);
-            mParam2 = getArguments().getString(ARG_PARAM2);
-        }
+
         sp = getActivity().getSharedPreferences("MyPref", Context.MODE_PRIVATE);
         editor = sp.edit();
-    }
 
-    TextView txtDistance;
-    ListView checkInListView;
+    }
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         // Inflate the layout for this fragment
         View root = inflater.inflate(R.layout.fragment_home, container, false);
+
         txtDistance = root.findViewById(R.id.TxtDistance);
-        txtDistance.setText(""+sp.getInt("myDistance", 0));
+        txtUsername = root.findViewById(R.id.TxtUsername);
+        ivProfile = root.findViewById(R.id.ProfilePicture);
         checkInListView = root.findViewById(R.id.checkInList);
+
+        txtDistance.setText(""+sp.getInt(USER_DISTANCE, 0));
+
+        String username = sp.getString(USER_USERNAME, null);
+        if(username != null) {
+            txtUsername.setText("@" + username);
+        }
+
+        String profileImg = sp.getString(USER_PROFILE, null);
+        if(profileImg != null) {
+            byte[] byteImage = Base64.decode(profileImg.getBytes(), Base64.DEFAULT);
+            ivProfile.setImageBitmap(BitmapFactory.decodeByteArray(byteImage,0, byteImage.length));
+        }
+
         // initialize map fragment
         //MapAddonFragment mapAddonFragment = new MapAddonFragment();
         //getChildFragmentManager().beginTransaction().replace(R.id.MapAddonFrame, mapAddonFragment).commit();
@@ -140,8 +162,9 @@ public class HomeFragment extends Fragment {
 
     public void updateData() {
 
-        RequestQueue queue = Volley.newRequestQueue(context);
+        final RequestQueue queue = Volley.newRequestQueue(context);
         String url = "http://indomotorart.com/tratra/RESTApi/getCheckIns.php";
+
         StringRequest getDataReq = new StringRequest(Request.Method.POST, url, new Response.Listener<String>() {
             @Override
             public void onResponse(String response) {
@@ -160,10 +183,43 @@ public class HomeFragment extends Fragment {
                             // TODO: SUCCESS
                             // get lat longs and calculate distance
                             JSONArray checkInList = responseJSON.getJSONArray("data");
+
+                            // set up username
+                            String username = responseJSON.getString("username");
+                            editor.putString("username", username);
+                            txtUsername.setText("@"+username);
+
+                            // set up profile image
+                            String ppUrl = responseJSON.getString("photo");
+                            Log.d("Main", ppUrl);
+                            // download image
+                            ImageRequest imageRequest = new ImageRequest(ppUrl, new Response.Listener<Bitmap>() {
+                                @Override
+                                public void onResponse(Bitmap response) {
+                                    ByteArrayOutputStream stream = new ByteArrayOutputStream();
+                                    response.compress(Bitmap.CompressFormat.PNG, 90, stream);
+                                    byte[] imageByte = stream.toByteArray();
+                                    ByteArrayInputStream inputStream = new ByteArrayInputStream(imageByte);
+                                    if(response.hasMipMap()) {
+                                        ivProfile.setImageBitmap(BitmapFactory.decodeStream(inputStream));
+                                        // save to session
+                                        String encodedImg = Base64.encodeToString(imageByte, 0);
+                                        editor.putString("profileImg", encodedImg);
+                                    }
+                                }
+                            }, 0, 0, ImageView.ScaleType.CENTER, Bitmap.Config.ARGB_4444, new Response.ErrorListener() {
+                                @Override
+                                public void onErrorResponse(VolleyError error) {
+                                    error.printStackTrace();
+                                }
+                            });
+                            queue.add(imageRequest);
+
+                            // set up distance
                             int distance = responseJSON.getInt("distance");
-                            Log.d("Main", distance+" TES");
                             String unit = " M";
                             StringBuilder distanceTxt = new StringBuilder(distance+"");
+
                             if(distance > 999) {
                                 unit = " KM";
                                 distanceTxt.delete(distanceTxt.length()-2, distanceTxt.length());

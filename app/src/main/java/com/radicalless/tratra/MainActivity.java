@@ -21,6 +21,7 @@ import android.os.Bundle;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
+import android.widget.FrameLayout;
 import android.widget.ProgressBar;
 import android.widget.Toast;
 import android.widget.Toolbar;
@@ -51,6 +52,7 @@ import com.google.android.gms.location.places.Places;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.radicalless.tratra.fragments.HomeFragment;
+import com.radicalless.tratra.fragments.LeaderboardFragment;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -62,7 +64,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-public class MainActivity extends AppCompatActivity implements HomeFragment.OnFragmentInteractionListener {
+public class MainActivity extends AppCompatActivity implements HomeFragment.OnFragmentInteractionListener, LeaderboardFragment.OnFragmentInteractionListener {
 
     SharedPreferences sp;
     SharedPreferences.Editor editor;
@@ -72,10 +74,9 @@ public class MainActivity extends AppCompatActivity implements HomeFragment.OnFr
 
     // Menu Bar
     ImageButton mFeedButton;
-    ImageButton mWorldButton;
-    LinearLayout mCheckInButton;
-    ImageButton mMapButton;
-    ImageButton mHomeButton;
+    FrameLayout mWorldButton;
+    FrameLayout mCheckInButton;
+    FrameLayout mHomeButton;
     ProgressBar mCheckInProgress;
 
     // Fragment controllers
@@ -84,6 +85,7 @@ public class MainActivity extends AppCompatActivity implements HomeFragment.OnFr
 
     // Fragment classes
     HomeFragment homeFragment;
+    LeaderboardFragment leaderboardFragment;
 
     PlaceDetectionClient placeDetectionClient;
     LocationRequest locationRequest;
@@ -91,6 +93,8 @@ public class MainActivity extends AppCompatActivity implements HomeFragment.OnFr
     public static final int MY_PERMISSIONS_REQUEST_FINE_LOCATION = 1;
 
     Context context = this;
+
+    boolean isCheckingIn = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -122,60 +126,49 @@ public class MainActivity extends AppCompatActivity implements HomeFragment.OnFr
         bottomMenuBar = findViewById(R.id.BottomMenuBar);
 
         // menu bar button references
-        mFeedButton = findViewById(R.id.MBarFeedButton);
         mWorldButton = findViewById(R.id.MBarWorldButton);
         mCheckInButton = findViewById(R.id.MBarRecordingButton);
-        mMapButton = findViewById(R.id.MBarMapButton);
         mHomeButton = findViewById(R.id.MBarHomeButton);
         mCheckInProgress = findViewById(R.id.checkInProgress);
 
         // setup fragment controllers
         fragmentManager = getSupportFragmentManager();
 
-        mCheckInButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                handleCheckInButtonClick();
-            }
-        });
-
         // menu bar button listeners
         for (int i = 0; i < bottomMenuBar.getChildCount(); i++) {
-            Log.d("Main", bottomMenuBar.getChildAt(i).getClass().getName());
-            if (bottomMenuBar.getChildAt(i).getClass().getName().equals("android.support.v7.widget.AppCompatImageButton")) {
-                Log.d("Main", "image button class");
-
-                Log.d("Main", "IN");
-                final ImageButton imageButton = (ImageButton) bottomMenuBar.getChildAt(i);
-                final Context context = this;
-                bottomMenuBar.getChildAt(i).setOnClickListener(new View.OnClickListener() {
-                    @Override
-                    public void onClick(View view) {
-                        // make all color of menuBar buttons to be grey
-                        // make the selected button color to be active color if it's not new post button
+            final FrameLayout navButton = (FrameLayout) bottomMenuBar.getChildAt(i);
+            final Context context = this;
+            final int index = i;
+            bottomMenuBar.getChildAt(i).setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    // make all color of menuBar buttons to be grey
+                    // make the selected button color to be active color if it's not new post button
+                        FrameLayout frameLayout = (FrameLayout)bottomMenuBar.getChildAt(index);
+                    if(index != 1) {
                         turnOffAllButton();
-                        imageButton.setColorFilter(ContextCompat.getColor(context, R.color.colorAccent));
+                        frameLayout.setBackgroundColor(ContextCompat.getColor(context, R.color.colorPrimaryDarker));
                         // call for custom click function
-                        if (getResources().getResourceEntryName(imageButton.getId()).equals("MBarFeedButton")) {
-                            handleFeedButtonClick();
-                        }
-
-                        if (getResources().getResourceEntryName(imageButton.getId()).equals("MBarWorldButton")) {
-                            Log.d("Main", "WORLD");
-                            handleWorldButtonClick();
-                        }
-
-                        if (getResources().getResourceEntryName(imageButton.getId()).equals("MBarMapButton")) {
-                            handleMapButtonClick();
-                        }
-
-                        if (getResources().getResourceEntryName(imageButton.getId()).equals("MBarHomeButton")) {
-                            handleHomeButtonClick();
-                            Log.d("Main", "HOME CLICKED");
-                        }
                     }
-                });
-            }
+
+                    if (getResources().getResourceEntryName(navButton.getId()).equals("MBarRecordingButton")) {
+                        Log.d("Main", "Check in button clicked. Current checking status: " + isCheckingIn);
+                        handleCheckInButtonClick();
+                    }
+
+                    if (getResources().getResourceEntryName(navButton.getId()).equals("MBarWorldButton")) {
+                        Log.d("Main", "WORLD");
+                        handleWorldButtonClick();
+                    }
+
+                    if (getResources().getResourceEntryName(navButton.getId()).equals("MBarHomeButton")) {
+                        handleHomeButtonClick();
+                        Log.d("Main", "HOME CLICKED");
+                    }
+
+                }
+            });
+
         }
 
         // set default activity
@@ -221,9 +214,9 @@ public class MainActivity extends AppCompatActivity implements HomeFragment.OnFr
 
     public void turnOffAllButton() {
         for (int i = 0; i < bottomMenuBar.getChildCount(); i++) {
-            if (bottomMenuBar.getChildAt(i).getClass().getName().equals("android.support.v7.widget.AppCompatImageButton")) {
-                ImageButton imageButton = (ImageButton) bottomMenuBar.getChildAt(i);
-                imageButton.setColorFilter(ContextCompat.getColor(this, R.color.colorOff));
+            if (i != 1) {
+                FrameLayout frameLayout = (FrameLayout) bottomMenuBar.getChildAt(i);
+                frameLayout.setBackgroundColor(ContextCompat.getColor(this, R.color.colorPrimaryDark));
             }
         }
     }
@@ -233,11 +226,12 @@ public class MainActivity extends AppCompatActivity implements HomeFragment.OnFr
     }
 
     void handleWorldButtonClick() {
-
-    }
-
-    void handleMapButtonClick() {
-
+        fragmentTransaction = fragmentManager.beginTransaction();
+        if (leaderboardFragment == null) {
+            leaderboardFragment = new LeaderboardFragment();
+        }
+        fragmentTransaction.replace(R.id.FragmentContainer, leaderboardFragment);
+        fragmentTransaction.commit();
     }
 
     void switchVisibility(View v1, View v2, boolean status) {
@@ -255,12 +249,15 @@ public class MainActivity extends AppCompatActivity implements HomeFragment.OnFr
     }
 
     void handleCheckInButtonClick() {
-        switchVisibility(mCheckInButton.getChildAt(0), mCheckInButton.getChildAt(1), true);
-        // check for location permission
-        if(isLocationPermissionGranted()) {
-            getUserLocation();
-        } else {
-            requestLocationPermission();
+        if(!isCheckingIn) {
+            isCheckingIn = true;
+            switchVisibility(mCheckInButton.getChildAt(0), mCheckInButton.getChildAt(1), true);
+            // check for location permission
+            if (isLocationPermissionGranted()) {
+                checkAndAskForGPS();
+            } else {
+                requestLocationPermission();
+            }
         }
     }
 
@@ -298,6 +295,57 @@ public class MainActivity extends AppCompatActivity implements HomeFragment.OnFr
                             .show();
                 }
         }
+    }
+
+    public void checkAndAskForGPS() {
+        Log.d("PostActivity", "checking for GPS...");
+        locationRequest = LocationRequest.create();
+        locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
+
+        LocationSettingsRequest.Builder builder = new LocationSettingsRequest.Builder()
+                .addLocationRequest(locationRequest);
+        builder.setAlwaysShow(true);
+        Task<LocationSettingsResponse> result = LocationServices.getSettingsClient(this).checkLocationSettings(builder.build());
+
+        result.addOnCompleteListener(new OnCompleteListener<LocationSettingsResponse>() {
+            @Override
+            public void onComplete(@NonNull Task<LocationSettingsResponse> task) {
+                try {
+                    Log.d("PostActivity", "succeed checking gps.");
+                    LocationSettingsResponse response = task.getResult(ApiException.class);
+                    if(response.getLocationSettingsStates().isGpsUsable()) {
+                        getUserLocation();
+                    } else {
+                        Log.d("Main", "Can't use GPS");
+                    }
+                } catch (ApiException e) {
+                    isCheckingIn = false;
+                    switchVisibility(mCheckInButton.getChildAt(0), mCheckInButton.getChildAt(1), false);
+                    Log.d("PostActivity", "Status code: " + e.getStatusCode());
+                    switch (e.getStatusCode()) {
+                        case LocationSettingsStatusCodes.SUCCESS:
+                            getUserLocation();
+                            break;
+                        case LocationSettingsStatusCodes.RESOLUTION_REQUIRED:
+                            // show up dialog
+                            try {
+                                ResolvableApiException resolvableApiException = (ResolvableApiException)e;
+                                resolvableApiException.startResolutionForResult(
+                                        MainActivity.this,
+                                        REQUEST_CHECK_SETTINGS
+                                );
+                            } catch (IntentSender.SendIntentException ex) {
+
+                            } catch (ClassCastException exc) {
+
+                            }
+                            break;
+                        case LocationSettingsStatusCodes.SETTINGS_CHANGE_UNAVAILABLE:
+                            break;
+                    }
+                }
+            }
+        });
     }
 
     public void getUserLocation() {
@@ -351,7 +399,7 @@ public class MainActivity extends AppCompatActivity implements HomeFragment.OnFr
             }
         };
         Log.d("PostActivity", "Request for location.");
-        Location response = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+        Location response = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
         if (response != null) {
             if(isInternetConnected()) {
                 checkIn(response.getLatitude(), response.getLongitude());
@@ -373,6 +421,7 @@ public class MainActivity extends AppCompatActivity implements HomeFragment.OnFr
         // check permission
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             Log.d("PostActivity", "Location permission not granted!");
+            isCheckingIn = false;
             switchVisibility(mCheckInButton.getChildAt(0), mCheckInButton.getChildAt(1), false);
             // TODO: Consider calling
             //    ActivityCompat#requestPermissions
@@ -425,6 +474,7 @@ public class MainActivity extends AppCompatActivity implements HomeFragment.OnFr
                                 responseJSON = new JSONObject(response);
                             } catch (JSONException e) {
                                 e.printStackTrace();
+                                isCheckingIn = false;
                                 switchVisibility(mCheckInButton.getChildAt(0), mCheckInButton.getChildAt(1), false);
                             }
 
@@ -435,6 +485,7 @@ public class MainActivity extends AppCompatActivity implements HomeFragment.OnFr
                                     status = Boolean.valueOf(responseJSON.getString("status"));
 
                                     if(status) {
+                                        isCheckingIn = false;
                                         switchVisibility(mCheckInButton.getChildAt(0), mCheckInButton.getChildAt(1), false);
 
                                         Log.d("PostActivity", "Success sending data to server");
@@ -454,6 +505,8 @@ public class MainActivity extends AppCompatActivity implements HomeFragment.OnFr
                                                         }
                                                     })
                                                     .show();
+                                            isCheckingIn = false;
+                                            switchVisibility(mCheckInButton.getChildAt(0), mCheckInButton.getChildAt(1), false);
 
                                         }
 
@@ -462,6 +515,7 @@ public class MainActivity extends AppCompatActivity implements HomeFragment.OnFr
 
                                     }
                                 } catch (JSONException e) {
+                                    isCheckingIn = false;
                                     switchVisibility(mCheckInButton.getChildAt(0), mCheckInButton.getChildAt(1), false);
                                     Log.d("PostActivity", "EXCEPTION: Failed to send data to server");
                                     Toast.makeText(getApplicationContext(), "Check-In failed", Toast.LENGTH_LONG).show();
@@ -469,6 +523,7 @@ public class MainActivity extends AppCompatActivity implements HomeFragment.OnFr
 
                                 }
                             } else {
+                                isCheckingIn = false;
                                 switchVisibility(mCheckInButton.getChildAt(0), mCheckInButton.getChildAt(1), false);
                                 Log.d("PostActivity", "Unable to process response!");
                                 new AlertDialog.Builder(context)
@@ -486,6 +541,7 @@ public class MainActivity extends AppCompatActivity implements HomeFragment.OnFr
                     }, new Response.ErrorListener() {
                         @Override
                         public void onErrorResponse(VolleyError error) {
+                            isCheckingIn = false;
                             switchVisibility(mCheckInButton.getChildAt(0), mCheckInButton.getChildAt(1), false);
                             Log.d("PostActivity", "Error response");
                             new AlertDialog.Builder(getApplicationContext())
@@ -516,6 +572,7 @@ public class MainActivity extends AppCompatActivity implements HomeFragment.OnFr
                     queue.add(stringRequest);
 
                 } catch (ApiException e) {
+                    isCheckingIn = false;
                     switchVisibility(mCheckInButton.getChildAt(0), mCheckInButton.getChildAt(1), false);
                     e.printStackTrace();
 
@@ -563,7 +620,7 @@ public class MainActivity extends AppCompatActivity implements HomeFragment.OnFr
         } else {
             // get from cache first
             Set<String> checkInCache = sp.getStringSet("checkInCache", null);
-            String newLine = lat+","+lon;
+            String newLine = lat+""+lon;
             checkInCache.add(newLine);
             editor.putStringSet("checkInCache", checkInCache);
 
@@ -579,54 +636,6 @@ public class MainActivity extends AppCompatActivity implements HomeFragment.OnFr
                     }
                 })
                 .show();
-    }
-
-    public void checkAndAskForGPS() {
-        Log.d("PostActivity", "checking for GPS...");
-        locationRequest = LocationRequest.create();
-        locationRequest.setPriority(LocationRequest.);
-
-        LocationSettingsRequest.Builder builder = new LocationSettingsRequest.Builder()
-                .addLocationRequest(locationRequest);
-        builder.setAlwaysShow(true);
-        Task<LocationSettingsResponse> result = LocationServices.getSettingsClient(this).checkLocationSettings(builder.build());
-
-        result.addOnCompleteListener(new OnCompleteListener<LocationSettingsResponse>() {
-            @Override
-            public void onComplete(@NonNull Task<LocationSettingsResponse> task) {
-                try {
-                    Log.d("PostActivity", "succeed checking gps.");
-                    LocationSettingsResponse response = task.getResult(ApiException.class);
-                    if(response.getLocationSettingsStates().isGpsUsable()) {
-                        handleInternetExistence();
-                    }
-                } catch (ApiException e) {
-                    switchVisibility(mCheckInButton.getChildAt(0), mCheckInButton.getChildAt(1), false);
-                    Log.d("PostActivity", "Status code: " + e.getStatusCode());
-                    switch (e.getStatusCode()) {
-                        case LocationSettingsStatusCodes.SUCCESS:
-                            handleInternetExistence();
-                            break;
-                        case LocationSettingsStatusCodes.RESOLUTION_REQUIRED:
-                            // show up dialog
-                            try {
-                                ResolvableApiException resolvableApiException = (ResolvableApiException)e;
-                                resolvableApiException.startResolutionForResult(
-                                        MainActivity.this,
-                                        REQUEST_CHECK_SETTINGS
-                                );
-                            } catch (IntentSender.SendIntentException ex) {
-
-                            } catch (ClassCastException exc) {
-
-                            }
-                            break;
-                        case LocationSettingsStatusCodes.SETTINGS_CHANGE_UNAVAILABLE:
-                            break;
-                    }
-                }
-            }
-        });
     }
 
     public boolean isInternetConnected() {

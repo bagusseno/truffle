@@ -15,6 +15,13 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.Calendar;
+import java.util.Date;
+
 public class CheckInListAdapter extends ArrayAdapter {
 
     private final Activity context;
@@ -33,11 +40,42 @@ public class CheckInListAdapter extends ArrayAdapter {
         // define text place
         TextView txtPlaceName = rowView.findViewById(R.id.txtPlaceName);
         TextView txtTime = rowView.findViewById(R.id.txtTime);
-        // set text based on position
         try {
+            // data
+            String placeName = data.getJSONObject(position).getString("placeName");
+            String dateString = data.getJSONObject(position).getString("date");
+            String dateToShow = "";
+            // control data
+            SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+            Date date = simpleDateFormat.parse(dateString);
+            Calendar dateCal = Calendar.getInstance();
+            dateCal.setTime(date);
+            //- today
+            Date today = new Date();
+            Calendar todayCal = Calendar.getInstance();
+            todayCal.setTime(today);
+            // compare
+            if(dateCal.get(Calendar.DATE) == todayCal.get(Calendar.DATE) &&
+                    dateCal.get(Calendar.MONTH) == todayCal.get(Calendar.MONTH) &&
+                    dateCal.get(Calendar.YEAR) == todayCal.get(Calendar.YEAR) &&
+                    dateCal.get(Calendar.ERA) == todayCal.get(Calendar.ERA)
+                    ) {
+                dateToShow = "today";
+            } else if(dateCal.get(Calendar.DATE) == -1 + todayCal.get(Calendar.DATE) &&
+                    dateCal.get(Calendar.MONTH) == todayCal.get(Calendar.MONTH) &&
+                    dateCal.get(Calendar.YEAR) == todayCal.get(Calendar.YEAR) &&
+                    dateCal.get(Calendar.ERA) == todayCal.get(Calendar.ERA)) {
+                dateToShow = "yesterday";
+            } else {
+                dateToShow = new SimpleDateFormat("yyyy-MM-dd").format(date);
+            }
+
+            // set text based on position
             txtPlaceName.setText(data.getJSONObject(position).getString("placeName"));
-            txtTime.setText(data.getJSONObject(position).getString("date"));
+            txtTime.setText(dateToShow);
         } catch (JSONException e) {
+            e.printStackTrace();
+        } catch (ParseException e) {
             e.printStackTrace();
         }
         return rowView;
